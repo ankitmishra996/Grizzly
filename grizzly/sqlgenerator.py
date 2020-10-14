@@ -6,6 +6,12 @@ from grizzly.generator import GrizzlyGenerator
 
 import random
 import string
+import sqlite3
+import pandas as pd
+import os
+import warnings
+warnings.filterwarnings('ignore')
+
 
 class Query:
 
@@ -57,13 +63,35 @@ class Query:
     rightExpr = self._doExprToSQL(expr.right)
 
     return f"{leftExpr} {expr.opStr} {rightExpr}"
-
-  def _buildFrom(self,df):
+  def insertIntoDB(self,files,table,connection,sources ):
+      cursor=connection.cursor()
+      matching = [s for s in sources if files in s]
+      if files.lower().endswith('.csv'):
+          if (matching[0]):
+              row=cursor.execute("SELECT name from sqlite_master where type='table' and name='"+table+"'")
+              if(row.fetchone() == None):
+                  pd.read_csv(matching[0], sep=",").to_sql(table, connection, if_exists='replace', index=True)
+      elif files.lower().endswith(('.xlsx','.xls')):
+          row=cursor.execute("SELECT name from sqlite_master where type='table' and name='"+table+"'")
+          if(row.fetchone() == None):
+              df= pd.read_excel(matching[0], sheet_name=table)
+              df.to_sql(table,connection)
+      elif files.lower().endswith(('.db')):
+          c= connection.cursor();
+          c.execute('ATTACH DATABASE "'+matching[0]+'" as '+table+'')
+          connection.commit()
+  def _buildFrom(self,df,sources,connection):
 
     curr = df
     while curr is not None:
 
       if isinstance(curr,Table):
+        nameSplit=curr.table.rsplit(".",1)
+        curr.table=nameSplit[0]
+        if(len(nameSplit)>1):
+            self.insertIntoDB(nameSplit[0],nameSplit[1],connection,sources)
+            curr.table=nameSplit[1]
+
         self.table = f"{curr.table} {curr.alias}"
 
       elif isinstance(curr,Projection):
@@ -73,8 +101,6 @@ class Query:
             self.projections = prefixed
           else:
             set(self.projections).intersection(set(prefixed))
-        
-
         if curr.doDistinct:
           self.doDistinct = True
 
@@ -83,10 +109,14 @@ class Query:
         self.filters.append(exprStr)
 
       elif isinstance(curr, Join):
-
         if isinstance(curr.right, Table):
-          rightSQL = curr.right.table
-          rtVar = curr.right.alias
+            nameSplit=curr.right.table.rsplit(".",1)
+            curr.table=nameSplit[0]
+            if(len(nameSplit)>1):
+                self.insertIntoDB(nameSplit[0],nameSplit[1],connection,sources)
+                curr.right.table=nameSplit[1] 
+            rightSQL = curr.right.table
+            rtVar = curr.right.alias
         else:
           subQry = Query()
           rightSQL = f"({subQry._buildFrom(curr.right)})"
@@ -168,6 +198,6 @@ class SQLGenerator:
     funcCode = f"{funcStr}({colName})"
     return funcCode
 
-  def generate(self, df):
+  def generate(self, df, sources,connections):
     qry = Query()
-    return qry._buildFrom(df)
+    return qry._buildFrom(df,sources,connections)

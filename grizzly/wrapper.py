@@ -22,6 +22,9 @@ class wrapper(object):
       conn = sqlite3.connect('file::memory:?cache=shared')
       for connections in listOfConnection:
           if connections.lower().endswith('.csv'):
+              d=pd.read_csv(connections, sep=",")
+              for name,dtype in d.dtypes.iteritems():
+                  print(name,dtype)
               pd.read_csv(connections, sep=",").to_sql(os.path.splitext(os.path.basename(connections))[0], conn, if_exists='replace', index=True)
           elif connections.lower().endswith(('.xlsx','.xls')):
               df= pd.read_excel(connections, sheet_name=None)

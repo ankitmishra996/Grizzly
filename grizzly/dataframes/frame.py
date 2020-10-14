@@ -44,7 +44,6 @@ class DataFrame(object):
     return Projection(None, self, doDistinct = True)
 
   def join(self, other, on, how="inner", comp = "="):
-
     if isinstance(on, list):
       
       from grizzly.expression import ExpressionException

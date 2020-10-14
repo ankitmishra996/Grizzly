@@ -4,13 +4,14 @@ from grizzly.generator import GrizzlyGenerator
 
 class RelationalExecutor(object):
   
-  def __init__(self, connection, sqlGenerator=SQLGenerator()):
+  def __init__(self, connection, sources ,sqlGenerator=SQLGenerator()):
     super().__init__()
+    self.source = sources
     self.connection = connection
     self.sqlGenerator = sqlGenerator
 
   def generate(self, df):
-    return self.sqlGenerator.generate(df)
+    return self.sqlGenerator.generate(df,self.source,self.connection)
 
   def _execute(self, sql):
     cursor = self.connection.cursor()
@@ -112,8 +113,8 @@ class RelationalExecutor(object):
     Non-pretty mode outputs in CSV style -- the delim parameter can be used to 
     set the delimiter. Non-pretty mode ignores the maxColWidth parameter.
     """
-
-    sql = self.sqlGenerator.generate(df)
+    
+    sql = self.sqlGenerator.generate(df,self.source,self.connection)
     return self._execute(sql)
 
   def _execAgg(self, df, func, col):
